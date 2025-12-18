@@ -10,12 +10,12 @@ def index():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TryOn</title>
+    <title>NanoFit - Hand Control</title>
     <style>
         body {
             background-color: #000;
             color: white;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -40,7 +40,7 @@ def index():
             top: 0; left: 0;
             width: 100%; height: 100%;
             object-fit: cover;
-            transform: scaleX(-1);
+            transform: scaleX(-1); /* Mirror effect */
         }
 
         /* Status Box */
@@ -49,7 +49,7 @@ def index():
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             background: rgba(0, 0, 0, 0.85);
-            padding: 30px;
+            padding: 25px;
             border-radius: 16px;
             text-align: center;
             border: 1px solid #333;
@@ -71,7 +71,6 @@ def index():
             transition: transform 0.1s;
         }
         button:active { transform: scale(0.95); }
-
         #start-btn { background: #007bff; color: white; width: 100%; }
 
         /* Floating Interface */
@@ -102,9 +101,16 @@ def index():
         #upload-btn { display: none; }
         #remove-btn { background: rgba(255, 60, 60, 0.8); display: none; }
         
-        /* Error State */
         .error-mode #status-title { color: #ff4444 !important; }
         .error-mode { border-color: #ff4444 !important; }
+
+        /* Gesture Hint */
+        #gesture-hint {
+            position: absolute; top: 20px; left: 0; width: 100%;
+            text-align: center; color: rgba(255,255,255,0.6);
+            font-size: 0.9rem; pointer-events: none;
+            display: none;
+        }
 
     </style>
 </head>
@@ -114,9 +120,11 @@ def index():
         <video id="webcam" autoplay playsinline></video>
         <canvas id="output_canvas"></canvas>
         
+        <div id="gesture-hint">👌 Pinch fingers to move item</div>
+
         <div id="status-box">
-            <div id="status-title">TryOn</div>
-            <div id="status-desc">Virtual Try-On Experience</div>
+            <div id="status-title">NanoFit Hands</div>
+            <div id="status-desc">Control with your hands</div>
             <button id="start-btn">Start Camera</button>
         </div>
 
@@ -124,7 +132,7 @@ def index():
 
         <div class="ui-layer">
             <button id="upload-btn" class="action-btn" onclick="document.getElementById('file-input').click()">
-                <span>➕</span> Choose Item
+                <span>➕</span> Add Item
             </button>
             <button id="remove-btn" class="action-btn" onclick="clearItem()">
                 <span>✖</span> Remove
@@ -133,7 +141,7 @@ def index():
     </div>
 
     <script type="module">
-        import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js";
+        import { FaceLandmarker, HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js";
 
         const video = document.getElementById("webcam");
         const canvas = document.getElementById("output_canvas");
@@ -145,38 +153,45 @@ def index():
         const uploadBtn = document.getElementById("upload-btn");
         const removeBtn = document.getElementById("remove-btn");
         const fileInput = document.getElementById("file-input");
+        const gestureHint = document.getElementById("gesture-hint");
 
         let faceLandmarker = undefined;
+        let handLandmarker = undefined;
         let overlayImage = null;
         let lastVideoTime = -1;
 
-        // --- 1. SECURITY CHECK (Fixes the "Undefined" Error) ---
+        // Interaction State
+        let dragOffset = { x: 0, y: 0 };
+        let isPinching = false;
+        let pinchStartHand = { x: 0, y: 0 };
+        let pinchStartOffset = { x: 0, y: 0 };
+
+        // --- 1. SECURITY CHECK ---
         function checkSecurity() {
-            // Check if context is secure (HTTPS or Localhost)
             if (!window.isSecureContext) {
                 statusBox.classList.add("error-mode");
                 statusTitle.innerText = "Insecure Connection";
-                statusDesc.innerText = "Camera is blocked. You MUST use the Ngrok HTTPS link.";
+                statusDesc.innerText = "Camera is blocked. Use the Ngrok HTTPS link.";
                 startBtn.style.display = "none";
                 return false;
             }
             return true;
         }
 
-        // --- 2. START APP ---
+        // --- 2. START APP (Load 2 Models) ---
         startBtn.onclick = async function() {
             if (!checkSecurity()) return;
-            
             startBtn.disabled = true;
-            startBtn.innerText = "Loading...";
-            statusTitle.innerText = "Getting things Ready...";
-            statusDesc.innerText = "Almost done...";
+            startBtn.innerText = "Loading AI...";
+            statusTitle.innerText = "Initializing...";
+            statusDesc.innerText = "Loading Face & Hand Tracking...";
             
             try {
                 const filesetResolver = await FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
                 );
                 
+                // 1. Load Face Tracker
                 faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
                     baseOptions: {
                         modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
@@ -187,6 +202,16 @@ def index():
                     numFaces: 1
                 });
 
+                // 2. Load Hand Tracker
+                handLandmarker = await HandLandmarker.createFromOptions(filesetResolver, {
+                    baseOptions: {
+                        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+                        delegate: "GPU"
+                    },
+                    runningMode: "VIDEO",
+                    numHands: 2
+                });
+
                 statusTitle.innerText = "Starting Camera...";
                 startWebcam();
 
@@ -194,7 +219,7 @@ def index():
                 console.error(err);
                 statusTitle.innerText = "Error";
                 statusBox.classList.add("error-mode");
-                statusDesc.innerText = "Could not load AI.";
+                statusDesc.innerText = "Device might be too slow for AI.";
                 startBtn.disabled = false;
                 startBtn.innerText = "Retry";
             }
@@ -202,20 +227,9 @@ def index():
 
         function startWebcam() {
             const constraints = { 
-                video: { 
-                    facingMode: "user", // Front camera
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                } 
+                video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } } 
             };
             
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                statusBox.classList.add("error-mode");
-                statusTitle.innerText = "Camera Blocked";
-                statusDesc.innerText = "Browser denied access. Use Safari/Chrome on HTTPS.";
-                return;
-            }
-
             navigator.mediaDevices.getUserMedia(constraints)
                 .then((stream) => {
                     video.srcObject = stream;
@@ -228,29 +242,88 @@ def index():
                 .catch((err) => {
                     statusTitle.innerText = "Camera Denied";
                     statusBox.classList.add("error-mode");
-                    statusDesc.innerText = "Please allow camera access in Settings.";
+                    statusDesc.innerText = "Check settings.";
                     startBtn.disabled = false;
-                    startBtn.innerText = "Retry";
                 });
         }
 
+        // --- 3. MAIN LOOP ---
         async function renderLoop() {
             if (canvas.width !== video.videoWidth) {
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
             }
             let startTimeMs = performance.now();
-            if (faceLandmarker && lastVideoTime !== video.currentTime) {
+            
+            if (faceLandmarker && handLandmarker && lastVideoTime !== video.currentTime) {
                 lastVideoTime = video.currentTime;
-                const results = faceLandmarker.detectForVideo(video, startTimeMs);
+                
+                // Run Detectors
+                const faceResults = faceLandmarker.detectForVideo(video, startTimeMs);
+                const handResults = handLandmarker.detectForVideo(video, startTimeMs);
+
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                if (results.faceLandmarks && results.faceLandmarks.length > 0 && overlayImage) {
-                    drawAccessory(results.faceLandmarks[0]);
+
+                // PROCESS HANDS (For Interaction)
+                handleGestures(handResults);
+
+                // DRAW FACE
+                if (faceResults.faceLandmarks.length > 0 && overlayImage) {
+                    drawAccessory(faceResults.faceLandmarks[0]);
                 }
             }
             window.requestAnimationFrame(renderLoop);
         }
 
+        // --- 4. GESTURE LOGIC ---
+        function handleGestures(handResults) {
+            if (!handResults.landmarks || handResults.landmarks.length === 0) {
+                isPinching = false;
+                return;
+            }
+
+            // Check each hand
+            for (const landmarks of handResults.landmarks) {
+                // Points: 8 = Index Tip, 4 = Thumb Tip
+                const indexTip = landmarks[8];
+                const thumbTip = landmarks[4];
+
+                // Calculate Distance (Pinch)
+                const distance = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+                const isCurrentlyPinching = distance < 0.05; // 5% of screen width threshold
+
+                // Convert to pixels for drag logic
+                const handX = ((indexTip.x + thumbTip.x) / 2) * canvas.width;
+                const handY = ((indexTip.y + thumbTip.y) / 2) * canvas.height;
+
+                if (isCurrentlyPinching) {
+                    ctx.fillStyle = "#0f0"; // Green dot when pinching
+                    ctx.beginPath(); ctx.arc(handX, handY, 10, 0, 2*Math.PI); ctx.fill();
+
+                    if (!isPinching) {
+                        // START DRAG
+                        isPinching = true;
+                        pinchStartHand = { x: handX, y: handY };
+                        pinchStartOffset = { ...dragOffset };
+                    } else {
+                        // CONTINUE DRAG
+                        // Mirror logic: X movement is inverted
+                        const deltaX = (handX - pinchStartHand.x); 
+                        const deltaY = (handY - pinchStartHand.y);
+                        
+                        dragOffset.x = pinchStartOffset.x - deltaX; // Subtract X because of mirror
+                        dragOffset.y = pinchStartOffset.y + deltaY;
+                    }
+                } else {
+                    isPinching = false;
+                    // Yellow dot when hand detected but not pinching
+                    ctx.fillStyle = "rgba(255, 255, 0, 0.5)"; 
+                    ctx.beginPath(); ctx.arc(handX, handY, 5, 0, 2*Math.PI); ctx.fill();
+                }
+            }
+        }
+
+        // --- 5. DRAWING ---
         function drawAccessory(landmarks) {
             const leftEye = landmarks[145];
             const rightEye = landmarks[374];
@@ -260,13 +333,19 @@ def index():
             const ry = rightEye.y * canvas.height;
             const centerX = (lx + rx) / 2;
             const centerY = (ly + ry) / 2;
+
+            // Apply Hand Offset
+            const finalX = centerX - dragOffset.x;
+            const finalY = centerY + dragOffset.y;
+
             const eyeDist = Math.sqrt(Math.pow(rx - lx, 2) + Math.pow(ry - ly, 2));
             const angle = Math.atan2(ry - ly, rx - lx);
             const width = eyeDist * 2.5; 
             const ratio = overlayImage.height / overlayImage.width;
             const height = width * ratio;
+
             ctx.save();
-            ctx.translate(centerX, centerY);
+            ctx.translate(finalX, finalY);
             ctx.rotate(angle);
             ctx.drawImage(overlayImage, -width / 2, -height / 2, width, height);
             ctx.restore();
@@ -280,7 +359,10 @@ def index():
                 const img = new Image();
                 img.onload = () => { 
                     overlayImage = img; 
-                    removeBtn.style.display = "flex"; 
+                    removeBtn.style.display = "flex";
+                    gestureHint.style.display = "block";
+                    dragOffset = { x: 0, y: 0 };
+                    setTimeout(() => gestureHint.style.display = "none", 5000);
                 };
                 img.src = e.target.result;
             };
@@ -290,26 +372,13 @@ def index():
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) handleFile(e.target.files[0]);
         });
-        window.addEventListener('drop', (e) => { 
-            e.preventDefault(); 
-            if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-        });
-        window.addEventListener('dragover', (e) => e.preventDefault());
-        window.addEventListener('paste', (e) => {
-            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-            for (let item of items) {
-                if (item.kind === 'file') handleFile(item.getAsFile());
-            }
-        });
-
-        // Global functions for buttons
         window.clearItem = () => { 
             overlayImage = null; 
             removeBtn.style.display = "none"; 
             fileInput.value = "";
+            dragOffset = { x: 0, y: 0 };
         };
 
-        // Initial check
         checkSecurity();
     </script>
 </body>
