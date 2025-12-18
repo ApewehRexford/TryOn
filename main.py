@@ -1,9 +1,6 @@
-from flask import Flask, render_template_string
+from flask import Flask
 
 app = Flask(__name__)
-
-# We no longer process video in Python. 
-# Python just serves the webpage to the user.
 
 @app.route('/')
 def index():
@@ -13,192 +10,169 @@ def index():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NanoFit Web (Client Side)</title>
+    <title>NanoFit - Final</title>
     <style>
         body {
-            margin: 0;
-            background-color: #111;
+            background-color: #000;
             color: white;
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Courier New', Courier, monospace;
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-height: 100vh;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
         }
 
-        h1 { margin-top: 20px; font-weight: 300; letter-spacing: 2px; }
-        p { color: #aaa; margin-bottom: 20px; }
-
-        /* The Container */
-        .container {
+        .viewport {
             position: relative;
             width: 100%;
-            max-width: 640px;
+            max-width: 800px;
             aspect-ratio: 4/3;
-            border-radius: 16px;
+            border: 2px solid #333;
+            border-radius: 12px;
             overflow: hidden;
-            border: 3px dashed #444;
-            background: #000;
+            background: #111;
         }
 
-        .container.drag-active { border-color: #0f0; }
-
-        /* Both Video and Canvas sit on top of each other */
         video, canvas {
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
             object-fit: cover;
-            /* Flip horizontally for the mirror effect */
-            transform: scaleX(-1); 
+            transform: scaleX(-1);
         }
 
-        /* Loading Spinner */
-        #loading {
-            position: absolute; top: 50%; left: 50%;
+        #status-box {
+            position: absolute;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 1.5rem;
-            background: rgba(0,0,0,0.7);
-            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
             border-radius: 8px;
-            z-index: 10;
+            text-align: center;
+            border: 1px solid #555;
+            z-index: 100;
+            max-width: 80%;
         }
-
-        /* Controls */
-        .controls { margin-top: 20px; display: flex; gap: 10px; }
-        button {
-            padding: 10px 20px;
-            border: none; border-radius: 8px;
-            cursor: pointer; font-weight: bold;
-            font-size: 1rem;
-        }
-        .btn-clear { background: #ff4444; color: white; }
-        .btn-clear:hover { background: #cc0000; }
+        #status-title { font-size: 1.2rem; margin-bottom: 10px; color: #0f0; }
+        #status-desc { color: #ccc; font-size: 0.9rem; }
         
-        .upload-hint {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; align-items: center; justify-content: center;
-            background: rgba(0, 255, 0, 0.2);
-            font-size: 2rem; font-weight: bold;
-            opacity: 0; pointer-events: none; transition: opacity 0.2s;
-            z-index: 20;
+        #start-btn {
+            background: #007bff; color: white; border: none;
+            padding: 10px 20px; font-size: 1rem; border-radius: 5px;
+            cursor: pointer; margin-top: 10px;
         }
-        .drag-active .upload-hint { opacity: 1; }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
-    <h1>🔮 NanoFit JS</h1>
-    <p>Paste (Cmd+V) or Drag an image here. Runs 100% in browser.</p>
-
-    <div class="container" id="drop-zone">
-        <div id="loading">⚡ Loading AI Model...</div>
-        <div class="upload-hint">✨ DROP TO WEAR ✨</div>
+    <div class="viewport">
         <video id="webcam" autoplay playsinline></video>
         <canvas id="output_canvas"></canvas>
-    </div>
-
-    <div class="controls">
-        <button class="btn-clear" onclick="clearOverlay()">❌ Remove Item</button>
+        
+        <div id="status-box">
+            <div id="status-title">Ready</div>
+            <div id="status-desc">Click start to enable camera</div>
+            <button id="start-btn" onclick="initApp()">START CAMERA</button>
+        </div>
     </div>
 
     <script type="module">
-        import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js";
+        // USES VERSION 0.10.0 (Guaranteed Stable)
+        import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js";
 
         const video = document.getElementById("webcam");
         const canvas = document.getElementById("output_canvas");
         const ctx = canvas.getContext("2d");
-        const loadingMsg = document.getElementById("loading");
-        
-        let faceLandmarker;
+        const statusBox = document.getElementById("status-box");
+        const statusTitle = document.getElementById("status-title");
+        const statusDesc = document.getElementById("status-desc");
+        const startBtn = document.getElementById("start-btn");
+
+        let faceLandmarker = undefined;
+        let overlayImage = null;
         let lastVideoTime = -1;
-        let overlayImage = null; // This holds your glasses/mask
 
-        // 1. SETUP AI (MediaPipe)
-        async function createFaceLandmarker() {
-            const filesetResolver = await FilesetResolver.forVisionTasks(
-                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
-            );
-            faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
-                baseOptions: {
-                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-                    delegate: "GPU"
-                },
-                outputFaceBlendshapes: false,
-                runningMode: "VIDEO",
-                numFaces: 1
-            });
-            loadingMsg.style.display = "none";
-            startWebcam();
-        }
+        window.initApp = async function() {
+            startBtn.style.display = "none";
+            statusTitle.innerText = "Downloading AI...";
+            statusDesc.innerText = "Please wait...";
+            
+            try {
+                const filesetResolver = await FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
+                );
+                
+                faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+                    baseOptions: {
+                        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+                        delegate: "GPU"
+                    },
+                    outputFaceBlendshapes: false,
+                    runningMode: "VIDEO",
+                    numFaces: 1
+                });
 
-        // 2. SETUP WEBCAM
+                statusTitle.innerText = "Starting Camera...";
+                startWebcam();
+
+            } catch (err) {
+                console.error(err);
+                statusTitle.innerText = "Error";
+                statusTitle.style.color = "red";
+                statusDesc.innerText = "Ensure you are on localhost:8000";
+            }
+        };
+
         function startWebcam() {
-            navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
-                video.srcObject = stream;
-                video.addEventListener("loadeddata", predictWebcam);
-            });
+            navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } })
+                .then((stream) => {
+                    video.srcObject = stream;
+                    video.addEventListener("loadeddata", () => {
+                        statusBox.style.display = "none";
+                        renderLoop();
+                    });
+                })
+                .catch((err) => {
+                    statusTitle.innerText = "Camera Denied";
+                    statusTitle.style.color = "red";
+                    statusDesc.innerText = "You blocked the camera.";
+                });
         }
 
-        // 3. THE MAIN LOOP
-        async function predictWebcam() {
-            // Resize canvas to match video
+        async function renderLoop() {
             if (canvas.width !== video.videoWidth) {
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
             }
-
             let startTimeMs = performance.now();
-            if (lastVideoTime !== video.currentTime) {
+            if (faceLandmarker && lastVideoTime !== video.currentTime) {
                 lastVideoTime = video.currentTime;
-                // Detect faces
-                if (faceLandmarker) {
-                    const results = faceLandmarker.detectForVideo(video, startTimeMs);
-                    
-                    // Clear canvas
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                    // Draw Overlay if we have a face AND an image
-                    if (results.faceLandmarks && results.faceLandmarks.length > 0 && overlayImage) {
-                        const landmarks = results.faceLandmarks[0];
-                        drawOverlay(landmarks);
-                    }
+                const results = faceLandmarker.detectForVideo(video, startTimeMs);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                if (results.faceLandmarks && results.faceLandmarks.length > 0 && overlayImage) {
+                    drawAccessory(results.faceLandmarks[0]);
                 }
             }
-            window.requestAnimationFrame(predictWebcam);
+            window.requestAnimationFrame(renderLoop);
         }
 
-        // 4. MATH: Place the image
-        function drawOverlay(landmarks) {
-            // Get Eye Coordinates
-            const leftEye = landmarks[145];  // MediaPipe Point 145
-            const rightEye = landmarks[374]; // MediaPipe Point 374
-
-            // Convert normalized coordinates (0-1) to pixel coordinates
+        function drawAccessory(landmarks) {
+            const leftEye = landmarks[145];
+            const rightEye = landmarks[374];
             const lx = leftEye.x * canvas.width;
             const ly = leftEye.y * canvas.height;
             const rx = rightEye.x * canvas.width;
             const ry = rightEye.y * canvas.height;
-
-            // Calculate Center, Rotation, and Width
             const centerX = (lx + rx) / 2;
             const centerY = (ly + ry) / 2;
-            
-            // Distance between eyes
             const eyeDist = Math.sqrt(Math.pow(rx - lx, 2) + Math.pow(ry - ly, 2));
-            
-            // Scale multiplier (2.5x distance between eyes is a good fit for glasses)
-            const width = eyeDist * 2.5; 
-            
-            // Rotation angle
             const angle = Math.atan2(ry - ly, rx - lx);
-
-            // Maintain Aspect Ratio of the image
+            const width = eyeDist * 2.5; 
             const ratio = overlayImage.height / overlayImage.width;
             const height = width * ratio;
-
-            // Draw rotated image
             ctx.save();
             ctx.translate(centerX, centerY);
             ctx.rotate(angle);
@@ -206,31 +180,8 @@ def index():
             ctx.restore();
         }
 
-        // 5. DRAG & DROP + PASTE HANDLERS
-        const dropZone = document.getElementById('drop-zone');
-
-        // Drag Visuals
-        window.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-active'); });
-        window.addEventListener('dragleave', () => dropZone.classList.remove('drag-active'));
-        window.addEventListener('drop', (e) => { 
-            e.preventDefault(); 
-            dropZone.classList.remove('drag-active');
-            if (e.dataTransfer.files.length > 0) loadImage(e.dataTransfer.files[0]);
-        });
-
-        // Paste Handler
-        window.addEventListener('paste', (e) => {
-            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-            for (let item of items) {
-                if (item.kind === 'file') {
-                    dropZone.classList.add('drag-active');
-                    setTimeout(() => dropZone.classList.remove('drag-active'), 500);
-                    loadImage(item.getAsFile());
-                }
-            }
-        });
-
-        function loadImage(file) {
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) return;
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
@@ -240,16 +191,21 @@ def index():
             reader.readAsDataURL(file);
         }
 
-        // Expose clear function to global scope for the button
-        window.clearOverlay = () => { overlayImage = null; };
-
-        // START
-        createFaceLandmarker();
+        window.addEventListener('drop', (e) => { 
+            e.preventDefault(); 
+            if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        window.addEventListener('dragover', (e) => e.preventDefault());
+        window.addEventListener('paste', (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let item of items) {
+                if (item.kind === 'file') handleFile(item.getAsFile());
+            }
+        });
     </script>
 </body>
 </html>
     """
-
+    
 if __name__ == "__main__":
-    # Host 0.0.0.0 is required for ngrok/external access
     app.run(host='0.0.0.0', port=8000, debug=True)
