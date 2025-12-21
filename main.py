@@ -10,7 +10,7 @@ def index():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NanoFit - Ultimate</title>
+    <title>TryOn - Ultimate</title>
     <style>
         body {
             background-color: #000;
@@ -100,7 +100,7 @@ def index():
         </div>
 
         <div id="status-box">
-            <div id="status-title">NanoFit Ultimate</div>
+            <div id="status-title">TryOn Ultimate</div>
             <div id="status-desc">Face + Hand + Gestures</div>
             <button id="start-btn">Start Camera</button>
         </div>
@@ -258,7 +258,6 @@ def index():
                 }
 
                 // Check Peace Sign (Index & Middle UP, others DOWN)
-                // Tips: 8(Idx), 12(Mid), 16(Ring), 20(Pinky) | PIPs: 6, 10, 14, 18
                 if (landmarks[8].y < landmarks[6].y && // Index Up
                     landmarks[12].y < landmarks[10].y && // Middle Up
                     landmarks[16].y > landmarks[14].y && // Ring Down
@@ -296,7 +295,6 @@ def index():
         // --- FACE LOGIC (Draw, Mouth, 3D) ---
         function handleFace(landmarks, blendshapes) {
             // 1. MOUTH SWITCH (Jaw Open > 0.4)
-            // mediapipe outputFaceBlendshapes gives us 'jawOpen' score (0 to 1)
             const jawOpen = blendshapes.categories.find(c => c.categoryName === 'jawOpen').score;
             
             if (jawOpen > 0.4) {
@@ -313,12 +311,10 @@ def index():
             const rightEar = landmarks[454];
             const nose = landmarks[1];
             
-            // Compare nose distance to ears to determine turn
             const distLeft = Math.abs(nose.x - leftEar.x);
             const distRight = Math.abs(nose.x - rightEar.x);
-            const ratio = distLeft / (distRight + 0.001); // Avoid div by zero
+            const ratio = distLeft / (distRight + 0.001); 
             
-            // Scale X based on ratio (1.0 = Front, 0.5 = Side)
             let scaleX3D = 1.0;
             if (ratio > 1.5 || ratio < 0.6) scaleX3D = 0.75; // Squish if turning
 
@@ -358,7 +354,7 @@ def index():
             // Wait for flash to clear, then save
             setTimeout(() => {
                 const link = document.createElement('a');
-                link.download = `nanofit_selfie_${Date.now()}.png`;
+                link.download = `tryon_selfie_${Date.now()}.png`; // Renamed file
                 // Combine video + canvas for save
                 const tempCanvas = document.createElement('canvas');
                 tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
