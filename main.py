@@ -10,108 +10,80 @@ def index():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NanoFit - Hand Control</title>
+    <title>NanoFit - Ultimate</title>
     <style>
         body {
             background-color: #000;
             color: white;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            overflow: hidden;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            height: 100vh; margin: 0; overflow: hidden;
         }
 
         .viewport {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            max-width: 800px;
-            max-height: 100vh;
-            overflow: hidden;
-            background: #111;
+            position: relative; width: 100%; height: 100%;
+            max-width: 800px; max-height: 100vh;
+            overflow: hidden; background: #111;
         }
 
         video, canvas {
-            position: absolute;
-            top: 0; left: 0;
+            position: absolute; top: 0; left: 0;
             width: 100%; height: 100%;
             object-fit: cover;
-            transform: scaleX(-1); /* Mirror effect */
+            transform: scaleX(-1); /* Mirror */
         }
 
-        /* Status Box */
+        /* Flash Effect for Selfie */
+        #flash-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; opacity: 0; pointer-events: none;
+            transition: opacity 0.1s; z-index: 200;
+        }
+
         #status-box {
-            position: absolute;
-            top: 50%; left: 50%;
+            position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.85);
-            padding: 25px;
-            border-radius: 16px;
-            text-align: center;
-            border: 1px solid #333;
-            z-index: 100;
-            width: 80%;
-            max-width: 300px;
-            backdrop-filter: blur(10px);
+            background: rgba(0, 0, 0, 0.85); padding: 25px;
+            border-radius: 16px; text-align: center;
+            border: 1px solid #333; z-index: 100;
+            width: 80%; max-width: 300px; backdrop-filter: blur(10px);
         }
         #status-title { font-size: 1.4rem; margin-bottom: 10px; color: #0f0; font-weight: bold; }
         #status-desc { color: #ccc; font-size: 1rem; margin-bottom: 20px; }
         
         button {
-            border: none;
-            padding: 15px 30px;
-            border-radius: 50px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
+            border: none; padding: 15px 30px; border-radius: 50px;
+            font-size: 1.1rem; font-weight: 600; cursor: pointer;
             transition: transform 0.1s;
         }
         button:active { transform: scale(0.95); }
         #start-btn { background: #007bff; color: white; width: 100%; }
 
-        /* Floating Interface */
         .ui-layer {
-            position: absolute;
-            bottom: 40px;
-            left: 0;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            z-index: 50;
-            pointer-events: none;
+            position: absolute; bottom: 40px; left: 0; width: 100%;
+            display: flex; justify-content: center; gap: 15px;
+            z-index: 50; pointer-events: none;
         }
 
         .action-btn {
-            pointer-events: auto;
-            background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
-            color: white;
-            padding: 12px 24px;
-            border: 1px solid rgba(255,255,255,0.3);
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            pointer-events: auto; background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px); color: white;
+            padding: 12px 24px; border: 1px solid rgba(255,255,255,0.3);
+            display: flex; align-items: center; gap: 8px;
         }
         
         #upload-btn { display: none; }
         #remove-btn { background: rgba(255, 60, 60, 0.8); display: none; }
-        
         .error-mode #status-title { color: #ff4444 !important; }
         .error-mode { border-color: #ff4444 !important; }
 
-        /* Gesture Hint */
         #gesture-hint {
             position: absolute; top: 20px; left: 0; width: 100%;
-            text-align: center; color: rgba(255,255,255,0.6);
-            font-size: 0.9rem; pointer-events: none;
-            display: none;
+            text-align: center; color: rgba(255,255,255,0.8);
+            font-size: 0.9rem; pointer-events: none; display: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8); line-height: 1.5;
         }
-
     </style>
 </head>
 <body>
@@ -119,12 +91,17 @@ def index():
     <div class="viewport">
         <video id="webcam" autoplay playsinline></video>
         <canvas id="output_canvas"></canvas>
+        <div id="flash-overlay"></div>
         
-        <div id="gesture-hint">👌 Pinch fingers to move item</div>
+        <div id="gesture-hint">
+            😲 Open Mouth: Change Color<br>
+            ✌️ Peace Sign: Take Selfie<br>
+            🙌 Pinch 2 Hands: Zoom
+        </div>
 
         <div id="status-box">
-            <div id="status-title">NanoFit Hands</div>
-            <div id="status-desc">Control with your hands</div>
+            <div id="status-title">NanoFit Ultimate</div>
+            <div id="status-desc">Face + Hand + Gestures</div>
             <button id="start-btn">Start Camera</button>
         </div>
 
@@ -154,83 +131,75 @@ def index():
         const removeBtn = document.getElementById("remove-btn");
         const fileInput = document.getElementById("file-input");
         const gestureHint = document.getElementById("gesture-hint");
+        const flashOverlay = document.getElementById("flash-overlay");
 
-        let faceLandmarker = undefined;
-        let handLandmarker = undefined;
+        let faceLandmarker, handLandmarker;
         let overlayImage = null;
         let lastVideoTime = -1;
 
-        // Interaction State
+        // --- INTERACTION STATE ---
         let dragOffset = { x: 0, y: 0 };
-        let isPinching = false;
-        let pinchStartHand = { x: 0, y: 0 };
-        let pinchStartOffset = { x: 0, y: 0 };
+        let scaleMultiplier = 1.0;
+        let rotationHue = 0; // For Mouth Switch
+        
+        // Flags
+        let isDragging = false, isZooming = false;
+        let pinchStartHand = { x: 0, y: 0 }, pinchStartOffset = { x: 0, y: 0 };
+        let zoomStartDist = 0, zoomStartScale = 1.0;
+        
+        // Cooldowns
+        let lastSelfieTime = 0;
+        let isMouthOpen = false;
 
-        // --- 1. SECURITY CHECK ---
         function checkSecurity() {
             if (!window.isSecureContext) {
                 statusBox.classList.add("error-mode");
                 statusTitle.innerText = "Insecure Connection";
-                statusDesc.innerText = "Camera is blocked. Use the Ngrok HTTPS link.";
+                statusDesc.innerText = "Use Ngrok HTTPS link.";
                 startBtn.style.display = "none";
                 return false;
             }
             return true;
         }
 
-        // --- 2. START APP (Load 2 Models) ---
         startBtn.onclick = async function() {
             if (!checkSecurity()) return;
-            startBtn.disabled = true;
-            startBtn.innerText = "Loading AI...";
+            startBtn.disabled = true; startBtn.innerText = "Loading AI...";
             statusTitle.innerText = "Initializing...";
-            statusDesc.innerText = "Loading Face & Hand Tracking...";
             
             try {
                 const filesetResolver = await FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
                 );
                 
-                // 1. Load Face Tracker
                 faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
                     baseOptions: {
                         modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
                         delegate: "GPU"
                     },
-                    outputFaceBlendshapes: false,
-                    runningMode: "VIDEO",
-                    numFaces: 1
+                    outputFaceBlendshapes: true, // Needed for Mouth
+                    runningMode: "VIDEO", numFaces: 1
                 });
 
-                // 2. Load Hand Tracker
                 handLandmarker = await HandLandmarker.createFromOptions(filesetResolver, {
                     baseOptions: {
                         modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
                         delegate: "GPU"
                     },
-                    runningMode: "VIDEO",
-                    numHands: 2
+                    runningMode: "VIDEO", numHands: 2
                 });
 
                 statusTitle.innerText = "Starting Camera...";
                 startWebcam();
-
             } catch (err) {
                 console.error(err);
-                statusTitle.innerText = "Error";
-                statusBox.classList.add("error-mode");
-                statusDesc.innerText = "Device might be too slow for AI.";
+                statusTitle.innerText = "Error"; statusBox.classList.add("error-mode");
                 startBtn.disabled = false;
-                startBtn.innerText = "Retry";
             }
         };
 
         function startWebcam() {
-            const constraints = { 
-                video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } } 
-            };
-            
-            navigator.mediaDevices.getUserMedia(constraints)
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } } })
                 .then((stream) => {
                     video.srcObject = stream;
                     video.addEventListener("loadeddata", () => {
@@ -242,12 +211,9 @@ def index():
                 .catch((err) => {
                     statusTitle.innerText = "Camera Denied";
                     statusBox.classList.add("error-mode");
-                    statusDesc.innerText = "Check settings.";
-                    startBtn.disabled = false;
                 });
         }
 
-        // --- 3. MAIN LOOP ---
         async function renderLoop() {
             if (canvas.width !== video.videoWidth) {
                 canvas.width = video.videoWidth;
@@ -258,100 +224,156 @@ def index():
             if (faceLandmarker && handLandmarker && lastVideoTime !== video.currentTime) {
                 lastVideoTime = video.currentTime;
                 
-                // Run Detectors
                 const faceResults = faceLandmarker.detectForVideo(video, startTimeMs);
                 const handResults = handLandmarker.detectForVideo(video, startTimeMs);
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                // PROCESS HANDS (For Interaction)
-                handleGestures(handResults);
+                // 1. HAND GESTURES (Move, Zoom, Selfie)
+                handleHands(handResults);
 
-                // DRAW FACE
+                // 2. FACE LOGIC (Draw, Mouth Switch, 3D Turn)
                 if (faceResults.faceLandmarks.length > 0 && overlayImage) {
-                    drawAccessory(faceResults.faceLandmarks[0]);
+                    handleFace(faceResults.faceLandmarks[0], faceResults.faceBlendshapes[0]);
                 }
             }
             window.requestAnimationFrame(renderLoop);
         }
 
-        // --- 4. GESTURE LOGIC ---
-        function handleGestures(handResults) {
-            if (!handResults.landmarks || handResults.landmarks.length === 0) {
-                isPinching = false;
-                return;
+        // --- HAND LOGIC (Selfie & Pinch) ---
+        function handleHands(results) {
+            if (!results.landmarks) return;
+
+            let pinchingHands = [];
+            let peaceSignDetected = false;
+
+            for (const landmarks of results.landmarks) {
+                // Check Pinch (Thumb & Index close)
+                const pinchDist = Math.hypot(landmarks[8].x - landmarks[4].x, landmarks[8].y - landmarks[4].y);
+                if (pinchDist < 0.05) {
+                    pinchingHands.push({ 
+                        x: ((landmarks[8].x + landmarks[4].x)/2) * canvas.width, 
+                        y: ((landmarks[8].y + landmarks[4].y)/2) * canvas.height 
+                    });
+                }
+
+                // Check Peace Sign (Index & Middle UP, others DOWN)
+                // Tips: 8(Idx), 12(Mid), 16(Ring), 20(Pinky) | PIPs: 6, 10, 14, 18
+                if (landmarks[8].y < landmarks[6].y && // Index Up
+                    landmarks[12].y < landmarks[10].y && // Middle Up
+                    landmarks[16].y > landmarks[14].y && // Ring Down
+                    landmarks[20].y > landmarks[18].y) { // Pinky Down
+                    peaceSignDetected = true;
+                }
             }
 
-            // Check each hand
-            for (const landmarks of handResults.landmarks) {
-                // Points: 8 = Index Tip, 4 = Thumb Tip
-                const indexTip = landmarks[8];
-                const thumbTip = landmarks[4];
+            // SELFIE TRIGGER
+            if (peaceSignDetected && (Date.now() - lastSelfieTime > 2000)) {
+                triggerSelfie();
+            }
 
-                // Calculate Distance (Pinch)
-                const distance = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
-                const isCurrentlyPinching = distance < 0.05; // 5% of screen width threshold
+            // ZOOM & DRAG
+            if (pinchingHands.length === 2) {
+                isDragging = false;
+                const currDist = Math.hypot(pinchingHands[0].x - pinchingHands[1].x, pinchingHands[0].y - pinchingHands[1].y);
+                if (!isZooming) { isZooming = true; zoomStartDist = currDist; zoomStartScale = scaleMultiplier; }
+                else { scaleMultiplier = Math.max(0.2, Math.min(zoomStartScale * (currDist / zoomStartDist), 5.0)); }
+                
+                // Draw Zoom Line
+                ctx.strokeStyle = "#00aaff"; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(pinchingHands[0].x, pinchingHands[0].y); 
+                ctx.lineTo(pinchingHands[1].x, pinchingHands[1].y); ctx.stroke();
 
-                // Convert to pixels for drag logic
-                const handX = ((indexTip.x + thumbTip.x) / 2) * canvas.width;
-                const handY = ((indexTip.y + thumbTip.y) / 2) * canvas.height;
-
-                if (isCurrentlyPinching) {
-                    ctx.fillStyle = "#0f0"; // Green dot when pinching
-                    ctx.beginPath(); ctx.arc(handX, handY, 10, 0, 2*Math.PI); ctx.fill();
-
-                    if (!isPinching) {
-                        // START DRAG
-                        isPinching = true;
-                        pinchStartHand = { x: handX, y: handY };
-                        pinchStartOffset = { ...dragOffset };
-                    } else {
-                        // CONTINUE DRAG
-                        // Mirror logic: X movement is inverted
-                        const deltaX = (handX - pinchStartHand.x); 
-                        const deltaY = (handY - pinchStartHand.y);
-                        
-                        dragOffset.x = pinchStartOffset.x - deltaX; // Subtract X because of mirror
-                        dragOffset.y = pinchStartOffset.y + deltaY;
-                    }
-                } else {
-                    isPinching = false;
-                    // Yellow dot when hand detected but not pinching
-                    ctx.fillStyle = "rgba(255, 255, 0, 0.5)"; 
-                    ctx.beginPath(); ctx.arc(handX, handY, 5, 0, 2*Math.PI); ctx.fill();
-                }
+            } else if (pinchingHands.length === 1) {
+                isZooming = false;
+                if (!isDragging) { isDragging = true; pinchStartHand = pinchingHands[0]; pinchStartOffset = {...dragOffset}; }
+                else { dragOffset.x = pinchStartOffset.x - (pinchingHands[0].x - pinchStartHand.x); dragOffset.y = pinchStartOffset.y + (pinchingHands[0].y - pinchStartHand.y); }
+            } else {
+                isDragging = false; isZooming = false;
             }
         }
 
-        // --- 5. DRAWING ---
-        function drawAccessory(landmarks) {
-            const leftEye = landmarks[145];
-            const rightEye = landmarks[374];
-            const lx = leftEye.x * canvas.width;
-            const ly = leftEye.y * canvas.height;
-            const rx = rightEye.x * canvas.width;
-            const ry = rightEye.y * canvas.height;
-            const centerX = (lx + rx) / 2;
-            const centerY = (ly + ry) / 2;
+        // --- FACE LOGIC (Draw, Mouth, 3D) ---
+        function handleFace(landmarks, blendshapes) {
+            // 1. MOUTH SWITCH (Jaw Open > 0.4)
+            // mediapipe outputFaceBlendshapes gives us 'jawOpen' score (0 to 1)
+            const jawOpen = blendshapes.categories.find(c => c.categoryName === 'jawOpen').score;
+            
+            if (jawOpen > 0.4) {
+                if (!isMouthOpen) {
+                    rotationHue = (rotationHue + 45) % 360; // Change color
+                    isMouthOpen = true;
+                }
+            } else {
+                isMouthOpen = false;
+            }
 
-            // Apply Hand Offset
-            const finalX = centerX - dragOffset.x;
-            const finalY = centerY + dragOffset.y;
+            // 2. FAKE 3D (YAW CALCULATION)
+            const leftEar = landmarks[234];
+            const rightEar = landmarks[454];
+            const nose = landmarks[1];
+            
+            // Compare nose distance to ears to determine turn
+            const distLeft = Math.abs(nose.x - leftEar.x);
+            const distRight = Math.abs(nose.x - rightEar.x);
+            const ratio = distLeft / (distRight + 0.001); // Avoid div by zero
+            
+            // Scale X based on ratio (1.0 = Front, 0.5 = Side)
+            let scaleX3D = 1.0;
+            if (ratio > 1.5 || ratio < 0.6) scaleX3D = 0.75; // Squish if turning
 
-            const eyeDist = Math.sqrt(Math.pow(rx - lx, 2) + Math.pow(ry - ly, 2));
+            // 3. DRAW
+            const lx = landmarks[145].x * canvas.width;
+            const ly = landmarks[145].y * canvas.height;
+            const rx = landmarks[374].x * canvas.width;
+            const ry = landmarks[374].y * canvas.height;
+
+            const centerX = (lx + rx) / 2 - dragOffset.x;
+            const centerY = (ly + ry) / 2 + dragOffset.y;
+
+            const eyeDist = Math.hypot(rx - lx, ry - ly);
             const angle = Math.atan2(ry - ly, rx - lx);
-            const width = eyeDist * 2.5; 
-            const ratio = overlayImage.height / overlayImage.width;
-            const height = width * ratio;
+            const width = (eyeDist * 2.5) * scaleMultiplier;
+            const height = width * (overlayImage.height / overlayImage.width);
 
             ctx.save();
-            ctx.translate(finalX, finalY);
+            ctx.translate(centerX, centerY);
             ctx.rotate(angle);
-            ctx.drawImage(overlayImage, -width / 2, -height / 2, width, height);
+            
+            // Apply 3D Squish & Mouth Color
+            ctx.scale(scaleX3D, 1); 
+            ctx.filter = `hue-rotate(${rotationHue}deg)`;
+
+            ctx.drawImage(overlayImage, -width/2, -height/2, width, height);
             ctx.restore();
         }
 
-        // --- FILE HANDLING ---
+        function triggerSelfie() {
+            lastSelfieTime = Date.now();
+            
+            // Flash Effect
+            flashOverlay.style.opacity = 1;
+            setTimeout(() => flashOverlay.style.opacity = 0, 150);
+
+            // Wait for flash to clear, then save
+            setTimeout(() => {
+                const link = document.createElement('a');
+                link.download = `nanofit_selfie_${Date.now()}.png`;
+                // Combine video + canvas for save
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                tempCtx.translate(canvas.width, 0); tempCtx.scale(-1, 1); // Mirror video
+                tempCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                tempCtx.setTransform(1, 0, 0, 1, 0, 0); // Reset for overlay
+                tempCtx.drawImage(canvas, 0, 0);
+                
+                link.href = tempCanvas.toDataURL();
+                link.click();
+            }, 200);
+        }
+
         function handleFile(file) {
             if (!file.type.startsWith('image/')) return;
             const reader = new FileReader();
@@ -361,23 +383,15 @@ def index():
                     overlayImage = img; 
                     removeBtn.style.display = "flex";
                     gestureHint.style.display = "block";
-                    dragOffset = { x: 0, y: 0 };
-                    setTimeout(() => gestureHint.style.display = "none", 5000);
+                    setTimeout(() => gestureHint.style.display = "none", 8000);
                 };
                 img.src = e.target.result;
             };
             reader.readAsDataURL(file);
         }
 
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) handleFile(e.target.files[0]);
-        });
-        window.clearItem = () => { 
-            overlayImage = null; 
-            removeBtn.style.display = "none"; 
-            fileInput.value = "";
-            dragOffset = { x: 0, y: 0 };
-        };
+        fileInput.addEventListener('change', (e) => { if(e.target.files.length) handleFile(e.target.files[0]); });
+        window.clearItem = () => { overlayImage = null; removeBtn.style.display = "none"; fileInput.value = ""; dragOffset = {x:0,y:0}; scaleMultiplier = 1.0; rotationHue = 0; };
 
         checkSecurity();
     </script>
