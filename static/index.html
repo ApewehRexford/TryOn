@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XENO · Alien Hand Interface</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="viewport" id="viewport">
+        <video id="webcam" autoplay playsinline muted></video>
+        <canvas id="stage"></canvas>
+        <div class="scanlines"></div>
+
+        <aside id="hud" hidden>
+            <div class="hud-glyph" id="hud-glyph"></div>
+            <div class="hud-title" id="hud-title"></div>
+            <pre id="hud-stats"></pre>
+        </aside>
+
+        <nav id="tabs" hidden></nav>
+        <div id="mode-ui"></div>
+        <div id="hint" hidden></div>
+        <div id="toast" hidden></div>
+
+        <section id="boot">
+            <div class="boot-glyphs">⏃⏚☊⎅⟒⎎☌⊑⟟⟊☍⌰⋔⋏⍜⌿⍾⍀⌇⏁⎍⎐⍙⌖⊬⋉</div>
+            <h1>XENO</h1>
+            <p class="boot-sub">alien hand interface · four dimensions</p>
+            <ul class="boot-modes">
+                <li><b>Resonator</b> play a synth tuned to a non-human scale</li>
+                <li><b>Portal</b> frame a window and see through alien eyes</li>
+                <li><b>Artifacts</b> grab, fling and destroy zero-g relics</li>
+                <li><b>Entity</b> meet a creature that watches your hands</li>
+            </ul>
+            <button id="boot-btn">Establish link</button>
+            <p id="boot-status">camera + sound required · 🤟 hold to shift dimension</p>
+        </section>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module" src="/static/js/main.js"></script>
+</body>
+</html>

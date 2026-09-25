@@ -1,0 +1,129 @@
+:root {
+    --xeno: #00ffd0;
+    --bio: #7cffb2;
+    --void: #b18cff;
+    --ink: #d8fff6;
+    --panel: rgba(2, 12, 14, 0.62);
+    --line: rgba(0, 255, 208, 0.3);
+    --mono: "Space Mono", ui-monospace, Menlo, monospace;
+    --display: "Space Grotesk", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0; height: 100vh; height: 100dvh; overflow: hidden;
+    background: #000; color: var(--ink); font-family: var(--mono);
+    display: flex; align-items: center; justify-content: center;
+}
+
+.viewport { position: relative; width: 100%; height: 100%; max-width: 1400px; overflow: hidden; background: #010405; }
+#webcam { display: none; }
+#stage { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+.scanlines {
+    position: absolute; inset: 0; pointer-events: none; z-index: 5; opacity: 0.35;
+    background: repeating-linear-gradient(to bottom, rgba(0, 255, 208, 0.04) 0 1px, transparent 1px 3px);
+}
+
+/* Dimension-shift glitch on mode change */
+.viewport.shift #stage { animation: shift 0.45s steps(6) 1; }
+@keyframes shift {
+    0% { filter: hue-rotate(0) contrast(1); transform: translateX(0); }
+    20% { filter: hue-rotate(90deg) contrast(1.6); transform: translateX(-12px) skewX(4deg); }
+    40% { filter: hue-rotate(-60deg) invert(0.2); transform: translateX(10px); }
+    60% { filter: hue-rotate(160deg) saturate(3); transform: translateX(-6px) skewX(-3deg); }
+    100% { filter: none; transform: none; }
+}
+
+/* HUD */
+#hud {
+    position: absolute; top: 14px; left: 14px; z-index: 20; min-width: 230px;
+    padding: 12px 14px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 4px; backdrop-filter: blur(6px); pointer-events: none;
+    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+}
+#hud[hidden] { display: none; }
+.hud-glyph { color: var(--void); font-size: 13px; letter-spacing: 0.25em; opacity: 0.9; }
+.hud-title { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: 0.14em; color: var(--xeno); margin: 2px 0 8px; text-shadow: 0 0 12px rgba(0, 255, 208, 0.6); }
+#hud-stats { margin: 0; font: 11px/1.55 var(--mono); color: var(--ink); white-space: pre; }
+
+/* Mode tabs */
+#tabs {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 20;
+    display: flex; gap: 6px;
+}
+#tabs[hidden] { display: none; }
+#tabs button {
+    font: 700 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink);
+    background: var(--panel); border: 1px solid var(--line); padding: 7px 12px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; backdrop-filter: blur(6px);
+}
+#tabs button .glyph { color: var(--void); font-size: 10px; letter-spacing: 0.2em; font-weight: 400; }
+#tabs button.active { color: #001a15; background: var(--xeno); border-color: var(--xeno); box-shadow: 0 0 18px rgba(0, 255, 208, 0.5); }
+#tabs button.active .glyph { color: #003b30; }
+
+/* Caption hint (like a tutorial subtitle) */
+#hint {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 20;
+    max-width: min(92%, 980px); text-align: center; padding: 8px 16px;
+    font: 12px/1.5 var(--mono); color: var(--ink); background: var(--panel);
+    border: 1px solid var(--line); backdrop-filter: blur(6px);
+}
+#hint[hidden] { display: none; }
+
+#toast {
+    position: absolute; top: 76px; left: 50%; transform: translateX(-50%); z-index: 30;
+    padding: 6px 14px; font: 12px var(--mono); color: #001a15; background: var(--xeno);
+}
+#toast[hidden] { display: none; }
+
+/* Per-mode UI (Entity tools, transcript) */
+#mode-ui { position: absolute; inset: 0; z-index: 15; pointer-events: none; }
+.tool-panel {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 6px; pointer-events: auto;
+}
+.tool-panel button {
+    font: 700 11px var(--mono); letter-spacing: 0.1em; color: var(--ink); background: var(--panel);
+    border: 1px solid var(--line); padding: 9px 14px; cursor: pointer; backdrop-filter: blur(6px);
+}
+.tool-panel button.active { background: var(--bio); color: #002012; border-color: var(--bio); }
+.transcript {
+    position: absolute; top: 76px; right: 14px; max-width: 360px; padding: 10px 14px;
+    font: 13px/1.4 var(--mono); color: #001a15; background: #e9fff9; border-left: 4px solid var(--void);
+}
+.transcript[hidden] { display: none; }
+
+/* Boot screen */
+#boot {
+    position: absolute; inset: 0; z-index: 50; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; padding: 24px;
+    background: radial-gradient(ellipse at center, #06231f 0%, #010405 70%);
+}
+#boot[hidden] { display: none; }
+.boot-glyphs { color: var(--void); letter-spacing: 0.4em; font-size: 14px; opacity: 0.7; max-width: 90%; word-break: break-all; }
+#boot h1 {
+    font-family: var(--display); font-size: clamp(56px, 12vw, 120px); letter-spacing: 0.3em; margin: 12px 0 0 0.3em;
+    color: var(--xeno); text-shadow: 0 0 40px rgba(0, 255, 208, 0.6);
+}
+.boot-sub { color: var(--ink); opacity: 0.75; letter-spacing: 0.2em; text-transform: uppercase; font-size: 12px; margin: 4px 0 22px; }
+.boot-modes { list-style: none; padding: 0; margin: 0 0 26px; font-size: 13px; line-height: 2; text-align: left; }
+.boot-modes b { color: var(--bio); display: inline-block; width: 100px; }
+#boot-btn {
+    font: 700 14px var(--mono); letter-spacing: 0.2em; text-transform: uppercase;
+    color: #001a15; background: var(--xeno); border: none; padding: 14px 34px; cursor: pointer;
+    box-shadow: 0 0 30px rgba(0, 255, 208, 0.45);
+    clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+}
+#boot-btn:disabled { opacity: 0.6; cursor: wait; }
+#boot-status { margin-top: 14px; font-size: 12px; opacity: 0.7; }
+
+@media (max-width: 700px) {
+    #hud { min-width: 0; padding: 8px 10px; }
+    .hud-title { font-size: 16px; }
+    #hud-stats { font-size: 9px; }
+    #tabs { top: auto; bottom: 64px; }
+    #tabs button { padding: 6px 8px; font-size: 9px; }
+    .boot-modes b { width: 80px; }
+}
