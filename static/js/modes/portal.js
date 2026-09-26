@@ -147,7 +147,8 @@ export default class Portal {
                 return s + p.x * q.y - q.x * p.y;
             }, 0)) / 2;
             this.area = area;
-            this.open += ((area > 2500 ? 1 : 0) - this.open) * 0.2;
+            // Ignore near-closed frames so a tiny sliver doesn't flicker over your face.
+            this.open += ((area > 9000 ? 1 : 0) - this.open) * 0.2;
         } else {
             this.open += (0 - this.open) * 0.2;
             if (this.open < 0.02) { this.quad = null; this.filters.forEach((f) => f.reset()); }

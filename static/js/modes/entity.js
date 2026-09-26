@@ -252,10 +252,14 @@ export default class Entity {
                 target = { x: hd.palm.x, y: hd.palm.y - hd.size * 1.6 - st.S * 0.4 };
                 st.pos.x += (target.x - st.pos.x) * Math.min(1, dt * 1.8);
                 st.pos.y += (target.y - st.pos.y) * Math.min(1, dt * 1.8);
+            } else if (this.mood === "calm") {
+                // Drift home to the middle of the frame so it never gets stranded in a corner.
+                st.pos.x += (w / 2 - st.pos.x) * Math.min(1, dt * 0.4);
+                st.pos.y += (h * 0.45 - st.pos.y) * Math.min(1, dt * 0.4);
             }
             const m = st.S;
             st.pos.x = Math.min(w - m, Math.max(m, st.pos.x));
-            st.pos.y = Math.min(h - m, Math.max(m, st.pos.y));
+            st.pos.y = Math.min(h - m * 2.2, Math.max(h * 0.2 + m, st.pos.y));   // clear of the tabs, tentacles on screen
         }
         this.reach = this.mood === "curious" ? (palm || come) : null;
 

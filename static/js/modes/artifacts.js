@@ -16,11 +16,14 @@ function glyphTexture() {
     const c = document.createElement("canvas");
     c.width = 128; c.height = 512;
     const g = c.getContext("2d");
-    g.fillStyle = "#000"; g.fillRect(0, 0, 128, 512);
-    g.fillStyle = "#00ffd0";
-    g.font = "34px 'Apple Symbols', 'Segoe UI Symbol', sans-serif";
+    g.fillStyle = "#010806"; g.fillRect(0, 0, 128, 512);
+    g.strokeStyle = "rgba(0,255,208,0.35)";
+    g.lineWidth = 2;
+    g.strokeRect(8, 8, 112, 496);
+    g.fillStyle = "#5fffe0";
+    g.font = "bold 38px 'Apple Symbols', 'Segoe UI Symbol', sans-serif";
     g.textAlign = "center";
-    for (let y = 40; y < 512; y += 44) g.fillText(GLYPHS[(Math.random() * GLYPHS.length) | 0], 64, y);
+    for (let y = 52; y < 500; y += 46) g.fillText(GLYPHS[(Math.random() * GLYPHS.length) | 0], 64, y);
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
@@ -31,14 +34,19 @@ const BUILDERS = {
     seedpod() {
         const geo = new THREE.IcosahedronGeometry(0.8, 5);
         const base = geo.attributes.position.array.slice();
-        const mesh = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({
-            color: 0x6bffcf, metalness: 0.3, roughness: 0.2, iridescence: 1, iridescenceIOR: 1.8, clearcoat: 1,
-        }));
+        const mat = new THREE.MeshPhysicalMaterial({
+            color: 0x0a8f6c, metalness: 0.1, roughness: 0.45, iridescence: 0.8, iridescenceIOR: 1.8, clearcoat: 0.4,
+            emissive: 0x0bff9d, emissiveIntensity: 0.25, envMapIntensity: 0.5,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        const halo = new THREE.Mesh(new THREE.SphereGeometry(1.02, 32, 32), fresnelMaterial(0x3dffb8, 2));
         const group = new THREE.Group();
-        group.add(mesh);
+        group.add(mesh, halo);
         return {
             group, mesh, label: "SEED POD",
             update(t, dt, excite) {
+                mat.emissiveIntensity = 0.2 + 0.15 * Math.sin(t * 2.5) + excite * 0.5;
+                halo.material.uniforms.uTime.value = t;
                 // Breathing organic surface: displace along the normal with animated noise.
                 const pos = geo.attributes.position.array;
                 const amp = 0.14 + excite * 0.18;
@@ -58,10 +66,21 @@ const BUILDERS = {
         const mat = new THREE.MeshStandardMaterial({
             color: 0x05070a, metalness: 0.9, roughness: 0.18, emissive: 0xffffff, emissiveMap: glyphTexture(), emissiveIntensity: 1,
         });
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1.7, 0.2), mat);
+        const box = new THREE.BoxGeometry(0.85, 1.8, 0.24);
+        const mesh = new THREE.Mesh(box, mat);
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(box),
+            new THREE.LineBasicMaterial({ color: 0x5fffe0, toneMapped: false }));
+        const halo = new THREE.Mesh(new THREE.SphereGeometry(1.05, 32, 32), fresnelMaterial(0x00ffd0, 3, 0.8));
+        halo.scale.set(0.65, 1.1, 0.4);
         const group = new THREE.Group();
-        group.add(mesh);
-        return { group, mesh, label: "MONOLITH", update(t, dt, excite) { mat.emissiveIntensity = 0.6 + 0.4 * Math.sin(t * 3) + excite; } };
+        group.add(mesh, edges, halo);
+        return {
+            group, mesh, label: "MONOLITH",
+            update(t, dt, excite) {
+                mat.emissiveIntensity = 2.2 + 0.8 * Math.sin(t * 3) + excite * 2;
+                halo.material.uniforms.uTime.value = t;
+            },
+        };
     },
 
     gyroscope() {
@@ -116,10 +135,15 @@ const BUILDERS = {
     shards() {
         const group = new THREE.Group();
         const mat = new THREE.MeshPhysicalMaterial({
-            color: 0xb18cff, metalness: 0.2, roughness: 0.05, iridescence: 1, flatShading: true, clearcoat: 1,
+            color: 0x9d6bff, metalness: 0.3, roughness: 0.08, iridescence: 1, flatShading: true, clearcoat: 1,
+            emissive: 0x6a2bff, emissiveIntensity: 0.45,
         });
+        const shardGeo = new THREE.OctahedronGeometry(0.32, 0);
+        const edgeGeo = new THREE.EdgesGeometry(shardGeo);
+        const edgeMat = new THREE.LineBasicMaterial({ color: 0xe6d9ff, toneMapped: false, transparent: true, opacity: 0.9 });
         const shards = Array.from({ length: 6 }, (_, i) => {
-            const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), mat);
+            const m = new THREE.Mesh(shardGeo, mat);
+            m.add(new THREE.LineSegments(edgeGeo, edgeMat));
             m.scale.set(0.6, 1.5, 0.6);
             const a = (i / 6) * Math.PI * 2;
             m.userData = { a, r: 0.55 + (i % 2) * 0.15, y: (i % 3 - 1) * 0.3 };
@@ -168,7 +192,7 @@ export default class Artifacts {
     seed(w, h) {
         this.seeded = true;
         TYPES.slice(0, 4).forEach((type, i) => {
-            const it = this.spawn(type, { x: w * (0.2 + i * 0.2), y: h * 0.3 }, Math.min(w, h) * 0.08);
+            const it = this.spawn(type, { x: w * (0.2 + i * 0.2), y: h * 0.38 }, Math.min(w, h) * 0.08);
             it.vel = { x: (Math.random() - 0.5) * 40, y: (Math.random() - 0.5) * 40 };
         });
         this.typeIndex = 4;
@@ -279,7 +303,7 @@ export default class Artifacts {
                 const it = this.dual.item;
                 const dist = Math.hypot(a.pinch.x - b.pinch.x, a.pinch.y - b.pinch.y);
                 const ang = Math.atan2(b.pinch.y - a.pinch.y, b.pinch.x - a.pinch.x);
-                it.scale = Math.max(0.35, Math.min(4, this.dual.startScale * dist / this.dual.startDist));
+                it.scale = Math.max(0.35, Math.min(2.5, this.dual.startScale * dist / this.dual.startDist));
                 it.rotZ = this.dual.startRot + (ang - this.dual.startAngle);
                 it.pos.x += ((a.pinch.x + b.pinch.x) / 2 - it.pos.x) * 0.5;
                 it.pos.y += ((a.pinch.y + b.pinch.y) / 2 - it.pos.y) * 0.5;
@@ -332,7 +356,8 @@ export default class Artifacts {
                 const r = it.r * it.scale;
                 if (it.pos.x < r) { it.pos.x = r; it.vel.x = Math.abs(it.vel.x) * 0.6; }
                 if (it.pos.x > w - r) { it.pos.x = w - r; it.vel.x = -Math.abs(it.vel.x) * 0.6; }
-                if (it.pos.y < r) { it.pos.y = r; it.vel.y = Math.abs(it.vel.y) * 0.6; }
+                const top = h * 0.2 + r;   // keep clear of the tabs
+                if (it.pos.y < top) { it.pos.y = top; it.vel.y = Math.abs(it.vel.y) * 0.6; }
                 if (it.pos.y > h - r) { it.pos.y = h - r; it.vel.y = -Math.abs(it.vel.y) * 0.6; }
                 // Gravity well of the singularity.
                 const dx = hole.x - it.pos.x, dy = hole.y - it.pos.y, d = Math.hypot(dx, dy);

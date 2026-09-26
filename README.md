@@ -1,5 +1,7 @@
 # XENO · Alien Hand Interface
 
+![XENO demo: Resonator, Portal, Artifacts and Entity driven by hand tracking](docs/demo.gif)
+
 Real-time hand tracking that turns your webcam into alien technology. Four "dimensions" are driven entirely by your hands: an instrument tuned to a non-human scale, a portal that shows the world through alien eyes, zero-gravity relics you can grab and fling into a black hole, and a creature that watches your fingers. Everything runs in the browser, on-device; no video leaves your machine.
 
 ## Dimensions
